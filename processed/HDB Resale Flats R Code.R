@@ -2,7 +2,7 @@ dat = read.csv('C:/Users/Carel/Files/GitHub/HDB Resale Flats/processed/data_new.
 attach(dat)
 names(dat)
 dat = na.omit(dat)
-model = lm(sqrt(resale_price) ~ . - intercept, data=dat)
+model = lm(resale_price ~ ., data=dat)
 summary(model)
 plot(predict(model), residuals(model), xlab = 'Fitted values', ylab='Residuals')
 plot(hatvalues(model), ylab = "Leverage")
@@ -11,12 +11,16 @@ par(mfrow=c(2,2))
 plot(model)
 
 #Exploratory Analysis
-pairs(dat) #correlation between features, check for collinearity and non-linearity of data
-
+library(car)
+vif(model)
+dat = subset(dat, select=-c(Adjoined.flat, Apartment, Standard, Model.A,Simplified))
+names(dat)
+model1 = lm(resale_price~., data=dat)
+vif(model1)
 
 #forward selection
 library(leaps)
-regfit.fwd = regsubsets(resale_price~. -intercept, data=dat, nvmax=19, method='forward')
+regfit.fwd = regsubsets(resale_price~., data=dat, nvmax=19, method='forward')
 fwd_summary = summary(regfit.fwd)
 par(mfrow = c(2,2))
 plot(fwd_summary$rss, xlab='Number of Variables', ylab='R2', type = 'l')
@@ -37,18 +41,31 @@ set.seed(1)
 train = sample(1:nrow(dat), nrow(dat)*0.8)
 
 #Linear regression
-model1 = lm(log(resale_price)~ storey+floor_area_sqm+remaining_lease+Distance.to.CBD+mature_estate+DBSS
-            +Distance.to.nearest.MRT.station-intercept, data=dat[train,])
-summary(model1)
+linearmodel = lm(resale_price~ storey+floor_area_sqm+remaining_lease+Distance.to.CBD+mature_estate+DBSS
+            +Distance.to.nearest.MRT.station, data=dat[train,])
+summary(linearmodel)
 fitted = predict(model1, newdata=dat[-train,])
 resale_test = dat[-train,'resale_price']
-mse = mean((fitted - resale_test)^2) #4231458796
+mse = mean((fitted - resale_test)^2) #3872241663
 mse
 
 #ar(2) model
-AR_fit <- arima(dat[train,], order = c(2,0,0))
-predict_AR <- forecast(AR_fit, h=10)
-accuracy(predict_AR, dat[-train,])
+dat_month = read.csv('C:/Users/Carel/Files/GitHub/HDB Resale Flats/processed/DATA_FULL.csv', header=T)
+attach(dat_month)
+names(dat_month)
+tsdata = ts(resale_price, start=c(2017,1), frequency=12)
+plot(tsdata)
+components =decompose(ts(resale_price, start=c(2017,1), frequency =12))
+plot(components)
+
+acf(tsdata)
+pacf(tsdata)
+library(forecast)
+model_ar = auto.arima(tsdata, trace=TRUE)
+model_ar
+predict_AR <- predict(model_ar, h=10)
+
+#accuracy(predict_AR, dat[-train,])
 
 
 #plotting to see the forecast (optional)
@@ -65,28 +82,29 @@ points(AR_forecast + 2*AR_forecast_se, type = "l", col = 2, lty = 2)
 par=mfrow(c(1,1))
 library(tree)
 library(randomForest)
-tree_data = tree(resale_price~. -intercept, data=dat, subset=train)
+tree_data = tree(resale_price~., data=dat, subset=train)
 summary(tree_data)
 plot(tree_data)
 text(tree_data, pretty=0)
-rf = randomForest(resale_price~.-intercept, data=dat, subset=train,mtry=(ncol(dat)/3), importance =TRUE)
+rf = randomForest(resale_price~., data=dat, subset=train,mtry=(ncol(dat)/3), importance =TRUE)
 yhat.rf = predict(rf, newdata=dat[-train,])
-mean((yhat.rf - resale_test)^2) # 725346483
+mean((yhat.rf - resale_test)^2) # 731208327, 
 
-
+varImpPlot(rf)
+importance(rf)
 #Boosting
 #Parameter tuning for number of trees, interaction depth separately, keeping shrinkage constant
 library(gbm)
 
 #tuning for Interaction Depth
-depth1 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 1,shrinkage=0.1, cv.folds=10)
-depth2 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 2,shrinkage=0.1, cv.folds=10)
-depth3 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 3,shrinkage=0.1, cv.folds=10)
-depth4 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 4,shrinkage=0.1, cv.folds=10)
-depth5 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 5,shrinkage=0.1, cv.folds=10)
-depth6 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 6,shrinkage=0.1, cv.folds=10)
-depth7 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 7,shrinkage=0.1, cv.folds=10)
-depth8 = gbm(resale_price~. - intercept, data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 8,shrinkage=0.1, cv.folds=10)
+depth1 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 1,shrinkage=0.1, cv.folds=10)
+depth2 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 2,shrinkage=0.1, cv.folds=10)
+depth3 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 3,shrinkage=0.1, cv.folds=10)
+depth4 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 4,shrinkage=0.1, cv.folds=10)
+depth5 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 5,shrinkage=0.1, cv.folds=10)
+depth6 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 6,shrinkage=0.1, cv.folds=10)
+depth7 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 7,shrinkage=0.1, cv.folds=10)
+depth8 = gbm(resale_price~. , data=dat[train,],distribution = 'gaussian', n.trees=5000,interaction.depth = 8,shrinkage=0.1, cv.folds=10)
 
 results = depth1$cv.error
 results = cbind(results, depth2$cv.error)
@@ -105,10 +123,10 @@ min(depth8$cv.error)
 which.min(depth8$cv.error)
 
 #fit model with tuned parameters, d=8, n.trees=2000
-boost = gbm(resale_price~. -intercept, data=dat[train,], distribution='gaussian',n.trees=2000,interaction.depth=8, shrinkage=0.1)
+boost = gbm(resale_price~., data=dat[train,], distribution='gaussian',n.trees=3300,interaction.depth=8, shrinkage=0.1)
 summary(boost)
-yhat_boost = predict(boost, newdata=dat[-train,], n.trees=2000)
-mean((yhat_boost - resale_test)^2) #780136300
+yhat_boost = predict(boost, newdata=dat[-train,], n.trees=3300)
+mean((yhat_boost - resale_test)^2) # 737371220 for n.tress=3200
 
 
 #Neural Network
