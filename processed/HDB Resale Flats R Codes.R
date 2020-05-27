@@ -60,22 +60,10 @@ plot(components)
 
 acf(tsdata)
 pacf(tsdata)
-library(forecast)
+library("forecast")
 model_ar = auto.arima(tsdata, trace=TRUE)
 model_ar
-predict_AR <- predict(model_ar, h=10)
-
 #accuracy(predict_AR, dat[-train,])
-
-
-#plotting to see the forecast (optional)
-predict(AR_fit, n.ahead = 10)
-ts.plot(Nile, xlim = c(1871, 1980))
-AR_forecast <- predict(AR_fit, n.ahead = 10)$pred
-AR_forecast_se <- predict(AR_fit, n.ahead = 10)$se
-points(AR_forecast, type = "l", col = 2)
-points(AR_forecast - 2*AR_forecast_se, type = "l", col = 2, lty = 2)
-points(AR_forecast + 2*AR_forecast_se, type = "l", col = 2, lty = 2)
 
 
 #Random Forest
@@ -128,57 +116,5 @@ summary(boost)
 yhat_boost = predict(boost, newdata=dat[-train,], n.trees=3300)
 mean((yhat_boost - resale_test)^2) # 737371220 for n.tress=3200
 
-
-#Neural Network
-library(nnet)
-
-#Standardize data 
-m.train = apply(dat[train,],2,mean)
-sd.train = apply(dat[train,],2,sd)
-s.dat = as.data.frame(t((t(dat) - m.train)/sd.train))
-
-#PCA
-pr.out=prcomp(dat, scale=TRUE)
-out=pr.out$x
-plot(pr.out)
-pve=100*pr.out$sdev^2/sum(pr.out$sdev^2)
-
-#CV, use training data
-k=5
-fold.error = rep(0,k)
-n=length(resale_price[train])
-index = sample(n)
-foldbreaks = c(0,floor(n/k*1:k))
-cv.error.k=rep(0,7)
-t=c(20,25,30,33,35,37,40)
-d=0
-for(i in t) 
-{
-  d=d+1
-  for(fold in 1:k) 
-  {
-    curval = index[(1+foldbreaks[fold]):(foldbreaks[fold+1])]
-    lm.fit = nnet(resale_price~.-intercept,data=dat[-curval,],size=i,linout
-                  =TRUE,decay=0.01,MaxNWts=5000)
-    yhat=predict(lm.fit,dat[curval,])*sd(dat$resale_price) + mean(dat$resale_price)
-    fold.error[fold] = mean((dat[train,]$resale_price[curval]-yhat)^2)
-  }
-  cv.error.k[d] = mean(fold.error)
-}
-
-plot(t,cv.error.k,type='b')
-
-result=cv.error.k
-result=cbind(result,cv.error.k)
-
-matplot(t,result,type='l',lty=1,col=1:5,ylab="CV.error",xlab="Hidden Units")
-legend("topright",lty=1,col=1:5,legend=
-         c("D=0.5", "D=0.35", "D=0.25", "D=0.1", "D=0.01"))
-
-#Fitting NN with tuned paramters
-nn= nnet(resale_price~.-intercept,data=s.dat[train,],size=__,linout
-              =TRUE,decay=___,MaxNWts=2351)
-yhat.nn=predict(nn,newdata=s.dat[-train,])*sd(dat$resale_price) + mean(dat$resale_price) #normalize back for predictions
-mean((yhat.nn-dat[-train,]$resale_price)^2)
 
 
